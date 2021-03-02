@@ -1,0 +1,88 @@
+Zx.<x> = ZZ[]
+
+n = 7
+d = 5
+q = 256
+
+def invertmodprime(f,p):
+  T = Zx.change_ring(Integers(p)).quotient(x^n-1)
+  return Zx(lift(1 / T(f)))
+    
+def convolution(f,g):
+    return (f * g) % (x^n-1)
+    
+def randomdpoly():
+  assert d <= n
+  result = n*[0]
+  for j in range(d):
+    while True:
+      r = randrange(n)
+      if not result[r]: break
+    result[r] = 1-2*randrange(2)
+  return Zx(result)
+
+def invertmodpowerof2(f,q):
+  assert q.is_power_of(2)
+  g = invertmodprime(f,2)
+  while True:
+    r = balancedmod(convolution(g,f),q)
+    if r == 1: return g
+    g = balancedmod(convolution(g,2 - r),q)
+def balancedmod(f,q):
+  g = list(((f[i] + q//2) % q) - q//2 for i in range(n))
+  return Zx(g)
+
+def keypair():
+  while True:
+    try:
+      f = randomdpoly()
+      f3 = invertmodprime(f,3)
+      fq = invertmodpowerof2(f,q)
+      break
+    except:
+      pass
+  g = randomdpoly()
+  publickey = balancedmod(3 * convolution(fq,g),q)
+  secretkey = f,f3
+  return publickey,secretkey
+
+def encrypt(message,publickey):
+  r = randomdpoly()
+  return balancedmod(convolution(publickey,r) + message,q)
+
+def decrypt(ciphertext,secretkey):
+  f,f3 = secretkey
+  a = balancedmod(convolution(ciphertext,f),q)
+  return balancedmod(convolution(a,f3),3)
+
+def encodeASCIIToPolynomial(c):
+   
+    C = ord(c)
+    M = 0
+    i = 0
+    while(C > 0):
+        M = M + x^i*(C %2)
+        C = C//2
+        i += 1
+    return M
+    
+def decodePolynomialToASCII(D):
+
+    x =0
+    for t in D:
+        x = x + t
+        x = x *2
+    return x
+
+publickey,secretkey = keypair()
+print("Public key                    ",publickey)
+
+message = 'Z'
+print("Message to Encrypt            ", message)
+m = encodeASCIIToPolynomial(message)
+print("Message encoded to Polynomial ", m)
+c = encrypt(m,publickey)
+print("The ciphertext                ",c)
+M = decrypt(c,secretkey)
+print("The decrypted message         ",M)
+print("Decoding back to character     ",chr(decodePolynomialToASCII(M)))
